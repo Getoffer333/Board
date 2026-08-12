@@ -13,11 +13,12 @@ DATA_DIR = BASE_DIR / "data"
 RESUME_DIR = DATA_DIR / "resumes"
 IMPORT_DIR = DATA_DIR / "imports"
 BACKUP_DIR = DATA_DIR / "backups"
+AUDIO_DIR = DATA_DIR / "audio"
 CONFIG_DIR = BASE_DIR / "config"
 DB_PATH = DATA_DIR / "app.db"
 SCHEMA_PATH = Path(__file__).resolve().parent / "schema.sql"
 
-for _d in (DATA_DIR, RESUME_DIR, IMPORT_DIR, BACKUP_DIR, CONFIG_DIR):
+for _d in (DATA_DIR, RESUME_DIR, IMPORT_DIR, BACKUP_DIR, AUDIO_DIR, CONFIG_DIR):
     _d.mkdir(parents=True, exist_ok=True)
 
 

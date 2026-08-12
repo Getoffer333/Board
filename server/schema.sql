@@ -85,6 +85,9 @@ CREATE TABLE IF NOT EXISTS interview (
   action_items TEXT,
   result TEXT NOT NULL DEFAULT 'pending',
   self_score INTEGER,
+  audio_path TEXT,
+  transcript TEXT,
+  ai_review TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

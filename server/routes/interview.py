@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, File, UploadFile
 
-from ..db import now
+from ..db import AUDIO_DIR, now
 from ..models import (
     INTERVIEW_MODES,
     INTERVIEW_RESULTS,
@@ -9,6 +9,7 @@ from ..models import (
     assert_in,
 )
 from ..repositories.sqlite_repo import repo
+from ..services.transcriber import ai_review_interview, transcribe_audio
 
 router = APIRouter(prefix="/api/interviews", tags=["interview"])
 
@@ -109,3 +110,78 @@ def review(iid: int, payload: dict = Body(...)):
 def delete_interview(iid: int):
     repo("interview").delete(iid, summary=f"删除面试 {iid}")
     return {"ok": True}
+
+
+# ─── 录音上传 & AI 复盘 ──────────────────────────────────
+@router.post("/{iid}/upload-audio")
+async def upload_audio(iid: int, file: UploadFile = File(...)):
+    """上传面试录音文件。支持 mp3/m4a/wav/webm。"""
+    itv = repo("interview").get(iid)
+    if not itv:
+        raise BusinessError("面试不存在", 404)
+
+    suffix = file.filename[file.filename.rfind("."):] if "." in (file.filename or "") else ".mp3"
+    safe_name = f"interview_{iid}_{now().replace(' ', '_').replace(':', '-')}{suffix}"
+    path = AUDIO_DIR / safe_name
+    path.write_bytes(await file.read())
+
+    rel = f"audio/{safe_name}"
+    repo("interview").update(iid, {"audio_path": rel}, summary="上传面试录音")
+    return {"ok": True, "audio_path": rel}
+
+
+@router.post("/{iid}/transcribe")
+def transcribe(iid: int):
+    """将已上传的面试录音转为文字。"""
+    itv = repo("interview").get(iid)
+    if not itv:
+        raise BusinessError("面试不存在", 404)
+    if not itv.get("audio_path"):
+        raise BusinessError("请先上传录音文件")
+
+    audio_file = AUDIO_DIR.parent / itv["audio_path"]
+    if not audio_file.exists():
+        raise BusinessError("录音文件已丢失，请重新上传")
+
+    try:
+        text = transcribe_audio(str(audio_file))
+    except RuntimeError as e:
+        raise BusinessError(str(e))
+
+    repo("interview").update(iid, {"transcript": text}, summary="语音转文字完成")
+    return {"ok": True, "transcript": text}
+
+
+@router.post("/{iid}/ai-review")
+def ai_review(iid: int):
+    """基于转录文本 + 面试上下文，调用 AI 生成复盘分析。"""
+    from ..db import get_setting
+
+    if get_setting("llm_enabled", "0") != "1":
+        raise BusinessError("AI 在线模式未开启，请在设置中配置 API Key")
+
+    itv = repo("interview").get(iid)
+    if not itv:
+        raise BusinessError("面试不存在", 404)
+    if not itv.get("transcript"):
+        raise BusinessError("请先完成语音转文字")
+
+    app = repo("application").get(itv["application_id"])
+    context = {
+        "round": itv["round"],
+        "questions": itv.get("questions") or [],
+        "application_info": {
+            "company": app["company_snapshot"] if app else "",
+            "title": app["title_snapshot"] if app else "",
+        },
+    }
+
+    try:
+        review = ai_review_interview(itv["transcript"], context)
+    except RuntimeError as e:
+        raise BusinessError(str(e))
+
+    import json
+    repo("interview").update(iid, {"ai_review": json.dumps(review, ensure_ascii=False)},
+                               summary="AI 面试复盘完成")
+    return {"ok": True, "review": review}
