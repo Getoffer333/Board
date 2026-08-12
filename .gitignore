@@ -13,3 +13,6 @@ data/
 
 # 系统
 .DS_Store
+
+# 本地助手记忆（非项目源码）
+.workbuddy/
