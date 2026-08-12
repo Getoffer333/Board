@@ -18,6 +18,7 @@ from .routes import (
     jd,
     question,
     resume,
+    script,
     settings,
     skill,
     stats,
@@ -51,7 +52,7 @@ async def health():
     return {"ok": True}
 
 
-for _r in (resume, jd, application, interview, contact, skill, ai, stats, settings, backup, question):
+for _r in (resume, jd, application, interview, contact, skill, ai, stats, settings, backup, question, script):
     app.include_router(_r.router)
 
 # 前端构建产物由后端单端口托管；Vue 用 hash 路由，不需要服务端 fallback

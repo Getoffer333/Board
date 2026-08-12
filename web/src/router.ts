@@ -5,6 +5,7 @@ import Jds from './views/Jds.vue'
 import Applications from './views/Applications.vue'
 import Interviews from './views/Interviews.vue'
 import Skills from './views/Skills.vue'
+import Scripts from './views/Scripts.vue'
 import Contacts from './views/Contacts.vue'
 import Questions from './views/Questions.vue'
 import AiTools from './views/AiTools.vue'
@@ -17,6 +18,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/jds', component: Jds },
   { path: '/applications', component: Applications },
   { path: '/interviews', component: Interviews },
+  { path: '/scripts', component: Scripts },
   { path: '/skills', component: Skills },
   { path: '/contacts', component: Contacts },
   { path: '/questions', component: Questions },

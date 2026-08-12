@@ -4,14 +4,17 @@ import * as echarts from 'echarts'
 import api from '../api'
 import { toast } from '../toast'
 import { refreshOverdue, store } from '../store'
-import { LEVEL_COLORS } from '../constants'
-import type { SummaryStat, FunnelStat, DirectionStat, ResumeVersionStat, Overdue } from '../types'
+import { LEVEL_COLORS, STATUS_LABELS } from '../constants'
+import type { SummaryStat, FunnelStat, DirectionStat, ResumeVersionStat, Overdue, TimelineItem, JDRecommendation, WeeklySnapshot } from '../types'
 
 const summary = ref<SummaryStat | null>(null)
 const funnel = ref<FunnelStat | null>(null)
 const direction = ref<DirectionStat[]>([])
 const resumeVersions = ref<ResumeVersionStat[]>([])
 const overdue = ref<Overdue[]>([])
+const timeline = ref<TimelineItem[]>([])
+const jdRecs = ref<JDRecommendation[]>([])
+const weekly = ref<WeeklySnapshot | null>(null)
 
 const funnelEl = ref<HTMLElement | null>(null)
 const barEl = ref<HTMLElement | null>(null)
@@ -28,17 +31,21 @@ const cardDefs = [
   { key: 'contacts', label: '人脉', color: 'text-pink-600' },
   { key: 'questions', label: '题库', color: 'text-teal-600' },
   { key: 'skills', label: '技能', color: 'text-orange-600' },
+  { key: 'scripts', label: '逐字稿', color: 'text-fuchsia-600' },
   { key: 'reminders', label: '提醒', color: 'text-rose-600' }
 ] as const
 
 async function load() {
   try {
-    ;[summary.value, funnel.value, direction.value, resumeVersions.value, overdue.value] = await Promise.all([
+    ;[summary.value, funnel.value, direction.value, resumeVersions.value, overdue.value, timeline.value, jdRecs.value, weekly.value] = await Promise.all([
       api.get<SummaryStat>('/api/stats/summary'),
       api.get<FunnelStat>('/api/stats/funnel'),
       api.get<DirectionStat[]>('/api/stats/direction'),
       api.get<ResumeVersionStat[]>('/api/stats/resume-versions'),
-      api.get<Overdue[]>('/api/stats/overdue')
+      api.get<Overdue[]>('/api/stats/overdue'),
+      api.get<TimelineItem[]>('/api/stats/timeline?days=14'),
+      api.get<JDRecommendation[]>('/api/stats/jd-recommendations'),
+      api.get<WeeklySnapshot>('/api/stats/weekly-snapshot')
     ])
     store.overdue = overdue.value
     store.overdueCount = overdue.value.length
@@ -108,9 +115,27 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="space-y-5">
+    <!-- 本周/下周快照 -->
+    <div v-if="weekly" class="grid grid-cols-2 gap-3">
+      <div class="card flex items-center gap-3">
+        <span class="text-2xl">📤</span>
+        <div>
+          <div class="text-xs text-slate-400">本周投递</div>
+          <div class="text-xl font-bold text-indigo-600">{{ weekly.this_week.applications }}</div>
+        </div>
+      </div>
+      <div class="card flex items-center gap-3">
+        <span class="text-2xl">📅</span>
+        <div>
+          <div class="text-xs text-slate-400">下周面试 / 跟进</div>
+          <div class="text-xl font-bold text-cyan-600">{{ weekly.next_week.interviews }} <span class="text-sm text-slate-400">/</span> {{ weekly.next_week.followups }}</div>
+        </div>
+      </div>
+    </div>
+
     <!-- 统计卡片 -->
-    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-      <div v-for="c in cardDefs" :key="c.key" class="card flex flex-col">
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div v-for="c in cardDefs.slice(0, 6)" :key="c.key" class="card flex flex-col">
         <span class="text-xs text-slate-400">{{ c.label }}</span>
         <span class="mt-1 text-2xl font-bold" :class="c.color">{{ summary ? (summary as any)[c.key] : '-' }}</span>
       </div>
@@ -125,6 +150,37 @@ onBeforeUnmount(() => {
       <div class="card">
         <h3 class="mb-2 font-semibold text-slate-700">方向对比</h3>
         <div ref="barEl" class="h-72 w-full"></div>
+      </div>
+    </div>
+
+    <!-- JD 智能推荐 -->
+    <div v-if="jdRecs.length" class="card">
+      <h3 class="mb-3 font-semibold text-slate-700">📋 JD 推荐（按匹配分排序）</h3>
+      <div class="space-y-2">
+        <div v-for="r in jdRecs.slice(0, 8)" :key="r.jd_id" class="flex items-center gap-3 rounded-lg border border-slate-100 px-3 py-2 text-sm"
+          :class="r.applied ? 'opacity-50' : ''">
+          <span class="font-semibold text-lg w-10 text-center" :class="r.match_score >= 75 ? 'text-emerald-600' : r.match_score >= 50 ? 'text-amber-600' : 'text-slate-400'">
+            {{ r.match_score || '-' }}
+          </span>
+          <div class="flex-1 min-w-0">
+            <div class="font-medium truncate">{{ r.company }} · {{ r.title }}</div>
+            <div class="text-xs text-slate-400">{{ r.direction }} · {{ r.location }} · {{ r.salary }}</div>
+          </div>
+          <span v-if="r.applied" class="badge bg-blue-50 text-blue-600 text-xs">已投</span>
+          <span v-else-if="r.match_score >= 60" class="badge bg-emerald-50 text-emerald-600 text-xs">推荐</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 时间线 -->
+    <div v-if="timeline.length" class="card">
+      <h3 class="mb-3 font-semibold text-slate-700">📅 近期活动</h3>
+      <div class="space-y-2">
+        <div v-for="(t, i) in timeline.slice(0, 15)" :key="i" class="flex items-center gap-3 text-sm">
+          <span class="text-xs text-slate-400 w-20 shrink-0">{{ t.date }}</span>
+          <span class="badge shrink-0" :class="t.type === '投递' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'">{{ t.type }}</span>
+          <span class="text-slate-600 truncate">{{ t.company || t.summary || '' }}{{ t.title ? ' · ' + t.title : '' }}</span>
+        </div>
       </div>
     </div>
 

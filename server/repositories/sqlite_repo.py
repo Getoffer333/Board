@@ -14,11 +14,12 @@ JSON_FIELDS = {
     "jd": {"parsed_json": dict},
     "interview": {"interviewers": list, "questions": list},
     "match_result": {"dimension_scores": dict, "matched_points": list, "missing_points": list},
+    "interview_script": {"tags": list},
 }
 
 TIMESTAMPED = {
     "resume", "jd", "contact", "application", "interview",
-    "interview_question", "skill",
+    "interview_question", "skill", "interview_script",
 }
 
 

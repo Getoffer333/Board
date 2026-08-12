@@ -13,6 +13,7 @@ const menus = [
   { path: '/resumes', label: '简历库', icon: '📄' },
   { path: '/jds', label: 'JD库', icon: '📋' },
   { path: '/applications', label: '投递看板', icon: '🚀' },
+  { path: '/scripts', label: '逐字稿', icon: '🎙️' },
   { path: '/interviews', label: '面试中心', icon: '🎤' },
   { path: '/skills', label: '技能提升', icon: '📈' },
   { path: '/contacts', label: '人脉内推', icon: '🤝' },
@@ -53,7 +54,7 @@ function goOverdue(o: { entity: string; entity_id: number }) {
           <span>{{ m.icon }}</span>{{ m.label }}
         </RouterLink>
       </nav>
-      <div class="border-t border-slate-100 px-5 py-3 text-xs text-slate-400">v1.0 · 本地数据</div>
+      <div class="border-t border-slate-100 px-5 py-3 text-xs text-slate-400">v2.0 · 本地数据</div>
     </aside>
 
     <!-- 主区 -->

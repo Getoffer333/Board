@@ -157,8 +157,29 @@ CREATE TABLE IF NOT EXISTS setting (
   value TEXT
 );
 
+-- ============================================================
+-- 新增：面试逐字稿管理
+-- ============================================================
+CREATE TABLE IF NOT EXISTS interview_script (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  direction_tag TEXT NOT NULL DEFAULT '通用',
+  script_type TEXT NOT NULL DEFAULT '自我介绍',
+  content TEXT NOT NULL DEFAULT '',
+  tags TEXT NOT NULL DEFAULT '[]',
+  is_mastered INTEGER NOT NULL DEFAULT 0,
+  practice_count INTEGER NOT NULL DEFAULT 0,
+  last_practiced_at TEXT,
+  note TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_app_status ON application(status);
 CREATE INDEX IF NOT EXISTS idx_app_dir ON application(direction_tag);
 CREATE INDEX IF NOT EXISTS idx_app_resume ON application(resume_id);
 CREATE INDEX IF NOT EXISTS idx_itv_app ON interview(application_id);
 CREATE INDEX IF NOT EXISTS idx_log_ts ON activity_log(ts);
+CREATE INDEX IF NOT EXISTS idx_script_dir ON interview_script(direction_tag);
+CREATE INDEX IF NOT EXISTS idx_script_type ON interview_script(script_type);

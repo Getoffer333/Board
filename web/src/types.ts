@@ -186,6 +186,7 @@ export interface SummaryStat {
   contacts: number
   questions: number
   skills: number
+  scripts: number
   reminders: number
 }
 
@@ -205,4 +206,29 @@ export interface SuggestedSkill {
   direction_tag: string
   source: string
   category: string
+}
+
+export interface TimelineItem {
+  date: string
+  type: string
+  company?: string
+  title?: string
+  summary?: string
+}
+
+export interface JDRecommendation {
+  jd_id: number
+  company: string
+  title: string
+  direction: string
+  location: string
+  salary: string
+  match_score: number
+  matched_resume: string
+  applied: boolean
+}
+
+export interface WeeklySnapshot {
+  this_week: { start: string; end: string; applications: number }
+  next_week: { start: string; end: string; interviews: number; followups: number }
 }

@@ -69,3 +69,7 @@ export const LEVEL_COLORS: Record<string, string> = {
   warn: 'bg-amber-50 border-amber-300 text-amber-700',
   info: 'bg-sky-50 border-sky-300 text-sky-700'
 }
+
+// 逐字稿相关
+export const SCRIPT_TYPES = ['自我介绍', '工作经历', '项目介绍', '追问应答', '反问面试官', '薪资谈判', '其他']
+export const SCRIPT_TAGS = ['通用', '高频', '必背', '待打磨', '已定稿']
