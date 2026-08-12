@@ -1,0 +1,15 @@
+# 依赖与虚拟环境
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+web/node_modules/
+
+# 求职数据（隐私，不进仓库）
+data/
+
+# 日志
+*.log
+
+# 系统
+.DS_Store
