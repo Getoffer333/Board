@@ -31,7 +31,13 @@ async function markIntention() {
   try {
     const r = await api.post<any>(`/api/jds/${detail.value.jd.id}/mark-intention`)
     detail.value.jd.status = r.status
-    toast('success', r.status === 'intention' ? '已标为意向 ⭐' : '已取消意向')
+    if (r.status === 'intention') {
+      if (r.warning) toast('warn', r.warning)
+      else if (r.already_existed) toast('info', '已标为意向，投递看板已有该记录')
+      else toast('success', '已标为意向 ⭐，已同步到投递看板「意向」栏')
+    } else {
+      toast('success', r.removed ? '已取消意向，投递看板记录已移除' : '已取消意向')
+    }
     emit('changed')
   } catch (e: any) { toast('error', e.message) }
 }

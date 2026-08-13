@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from ..db import get_setting, load_json
+from ..db import get_setting, load_json, now
 from ..models import BusinessError, DIRECTIONS, assert_in
 from ..repositories.sqlite_repo import repo
 from ..services.matcher import match
@@ -156,14 +156,52 @@ def update_jd(jid: int, payload: JdIn):
 
 @router.post("/{jid}/mark-intention")
 def mark_intention(jid: int):
-    """一键标为意向 / 取消意向（切换）。"""
+    """一键标为意向 / 取消意向（切换）。标为意向会在投递看板创建一条意向记录。"""
     jd = repo("jd").get(jid)
     if not jd:
         raise BusinessError("JD 不存在", 404)
-    new_status = "active" if jd.get("status") == "intention" else "intention"
-    repo("jd").update(jid, {"status": new_status},
-                      summary=f"JD {jid} {'标为意向' if new_status == 'intention' else '取消意向'}")
-    return {"ok": True, "status": new_status}
+
+    if jd.get("status") == "intention":
+        # 取消意向：改 JD 状态 + 删除还未投递的意向记录
+        repo("jd").update(jid, {"status": "active"},
+                          summary=f"JD {jid} 取消意向")
+        removed = 0
+        for a in repo("application").list():
+            if a.get("jd_id") == jid and a.get("status") == "intention":
+                repo("application").delete(a["id"], summary="取消意向")
+                removed += 1
+        return {"ok": True, "status": "active", "application_id": None, "removed": removed}
+
+    # 标为意向
+    repo("jd").update(jid, {"status": "intention"},
+                      summary=f"JD {jid} 标为意向")
+
+    # 已有非关闭的投递记录，则不重复创建
+    for a in repo("application").list():
+        if a.get("jd_id") == jid and a.get("status") != "closed":
+            return {"ok": True, "status": "intention",
+                    "application_id": a["id"], "already_existed": True}
+
+    # 需要激活简历来创建意向记录
+    resumes = [r for r in repo("resume").list() if r.get("is_active", 1)]
+    if not resumes:
+        return {"ok": True, "status": "intention", "application_id": None,
+                "warning": "已标为意向，但无激活简历，投递看板需先上传简历"}
+
+    resume = resumes[0]
+    app = repo("application").create({
+        "jd_id": jid,
+        "resume_id": resume["id"],
+        "company_snapshot": jd["company"],
+        "title_snapshot": jd["title"],
+        "direction_tag": jd["direction_tag"],
+        "status": "intention",
+        "channel": "官网",
+        "priority": "中",
+        "stage_entered_at": now(),
+        "note": "",
+    }, summary=f"标为意向 {jd['company']} {jd['title']}")
+    return {"ok": True, "status": "intention", "application_id": app["id"]}
 
 
 @router.delete("/{jid}")
