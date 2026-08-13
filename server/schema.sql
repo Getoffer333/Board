@@ -143,6 +143,7 @@ CREATE TABLE IF NOT EXISTS match_result (
   dimension_scores TEXT NOT NULL DEFAULT '{}',
   matched_points TEXT NOT NULL DEFAULT '[]',
   missing_points TEXT NOT NULL DEFAULT '[]',
+  resume_edits TEXT NOT NULL DEFAULT '[]',
   suggestion TEXT,
   source TEXT NOT NULL DEFAULT 'local',
   created_at TEXT NOT NULL

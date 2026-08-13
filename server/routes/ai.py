@@ -154,6 +154,7 @@ def online_match(payload: dict = Body(...)):
         "dimension_scores": result.get("dimension_scores", {}),
         "matched_points": result.get("matched_points", []),
         "missing_points": result.get("missing_points", []),
+        "resume_edits": result.get("resume_edits", []),
         "suggestion": result.get("suggestion", ""),
         "source": "online",
     }, summary="AI 在线匹配打分")
@@ -163,8 +164,78 @@ def online_match(payload: dict = Body(...)):
         "dimension_scores": result.get("dimension_scores", {}),
         "matched_points": result.get("matched_points", []),
         "missing_points": result.get("missing_points", []),
+        "resume_edits": result.get("resume_edits", []),
         "suggested_skills": suggest_skills_from_missing(result.get("missing_points", []), jd["direction_tag"]),
     }
+
+
+@router.post("/batch-match")
+def batch_match(payload: dict = Body(...)):
+    """批量匹配：对勾选的多个 JD 用激活简历并行做 AI 匹配。"""
+    if get_setting("llm_enabled", "0") != "1":
+        raise BusinessError("在线模式未开启，请在设置中启用并配置 API Key")
+    jd_ids = payload.get("jd_ids") or []
+    if not jd_ids:
+        raise BusinessError("请先勾选要匹配的 JD")
+
+    resume_id = payload.get("resume_id")
+    resume = repo("resume").get(resume_id) if resume_id else None
+    if not resume:
+        actives = [r for r in repo("resume").list() if r.get("is_active", 1)]
+        resume = actives[0] if actives else None
+    if not resume:
+        raise BusinessError("请先上传简历（无激活简历可匹配）", 404)
+
+    jds = [repo("jd").get(i) for i in jd_ids]
+    jds = [j for j in jds if j]
+    if not jds:
+        raise BusinessError("没有可匹配的 JD")
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _match_one(jd):
+        try:
+            result = call_llm_json(build_match_prompt(jd, resume))
+            return jd, result, None
+        except Exception as e:
+            return jd, None, str(e)
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        fetched = list(pool.map(_match_one, jds))
+
+    results = []
+    for jd, result, err in fetched:
+        if err:
+            results.append({"jd_id": jd["id"], "company": jd["company"],
+                            "title": jd["title"], "ok": False, "error": err})
+        else:
+            repo("match_result").raw(
+                "DELETE FROM match_result WHERE jd_id=? AND resume_id=?",
+                (jd["id"], resume["id"]))
+            repo("match_result").create({
+                "jd_id": jd["id"], "resume_id": resume["id"],
+                "score": result.get("score", 0),
+                "dimension_scores": result.get("dimension_scores", {}),
+                "matched_points": result.get("matched_points", []),
+                "missing_points": result.get("missing_points", []),
+                "resume_edits": result.get("resume_edits", []),
+                "suggestion": result.get("suggestion", ""),
+                "source": "online",
+            }, summary="AI 批量匹配")
+            results.append({
+                "jd_id": jd["id"], "company": jd["company"], "title": jd["title"],
+                "ok": True, "score": result.get("score", 0),
+                "dimension_scores": result.get("dimension_scores", {}),
+                "matched_points": result.get("matched_points", []),
+                "missing_points": result.get("missing_points", []),
+                "resume_edits": result.get("resume_edits", []),
+                "suggestion": result.get("suggestion", ""),
+            })
+
+    ok = sum(1 for r in results if r["ok"])
+    return {"ok": True, "total": len(jds), "matched": ok,
+            "failed": len(jds) - ok, "results": results,
+            "resume_version": resume.get("version_name")}
 
 
 @router.post("/online-interview-q")
@@ -223,6 +294,7 @@ def import_result(payload: dict = Body(...)):
             "score": result["score"], "dimension_scores": result["dimension_scores"],
             "matched_points": result["matched_points"],
             "missing_points": result["missing_points"],
+            "resume_edits": result.get("resume_edits", []),
             "suggestion": result.get("suggestion", ""), "source": "online",
         }, summary="AI 匹配结果回填")
         return {

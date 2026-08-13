@@ -13,7 +13,7 @@ JSON_FIELDS = {
     "resume": {"direction_tags": list, "highlights": list},
     "jd": {"parsed_json": dict},
     "interview": {"interviewers": list, "questions": list},
-    "match_result": {"dimension_scores": dict, "matched_points": list, "missing_points": list},
+    "match_result": {"dimension_scores": dict, "matched_points": list, "missing_points": list, "resume_edits": list},
     "interview_script": {"tags": list},
 }
 

@@ -97,7 +97,7 @@ JD 要求：{chr(10).join(parsed.get('requirements', []))}
 ===== 简历版本：{resume.get('version_name')} =====
 {resume_text[:4000]}
 
-请输出**一个纯 JSON 对象**（不要解释文字、不要 ``` 包裹）：
+请输出**一个纯 JSON 对象**（不要解释文字、不要 ``` 包裹，尽量精简）：
 
 {{
   "jd_id": {jd.get('id')},
@@ -110,8 +110,9 @@ JD 要求：{chr(10).join(parsed.get('requirements', []))}
     "职责呼应": 0-15
   }},
   "matched_points": ["简历中已体现、且 JD 看重的点"],
-  "missing_points": ["JD 要求但简历里没体现的点（用于后续补简历/补技能）"],
-  "suggestion": "给求职者的改写与投递建议，2-4 句"
+  "missing_points": ["JD 要求但简历里没体现的点"],
+  "resume_edits": ["针对这份简历的具体修改建议，每条一句、可直接照做，例如'把XX项目成果量化成具体数字'、'补充XX技能关键词'"],
+  "suggestion": "给求职者的投递与准备建议，1-2 句"
 }}
 """
 
@@ -189,6 +190,7 @@ def validate_import(payload: dict) -> dict:
         }
         result["matched_points"] = list(result.get("matched_points", []) or [])
         result["missing_points"] = list(result.get("missing_points", []) or [])
+        result["resume_edits"] = list(result.get("resume_edits", []) or [])
     elif t == "interview_q":
         questions = result.get("questions")
         if not isinstance(questions, list) or not questions:

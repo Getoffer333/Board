@@ -102,6 +102,35 @@ async function openTrends() {
   } catch (e: any) { toast('error', e.message) }
 }
 
+// 勾选 + 批量 AI 匹配
+const selectedIds = ref<Set<number>>(new Set())
+const matchPanelOpen = ref(false)
+const matchResults = ref<any>(null)
+const matching = ref(false)
+
+function toggleSelect(id: number) {
+  const s = new Set(selectedIds.value)
+  if (s.has(id)) s.delete(id); else s.add(id)
+  selectedIds.value = s
+}
+function toggleAll() {
+  selectedIds.value = selectedIds.value.size === parsedItems.value.length
+    ? new Set()
+    : new Set(parsedItems.value.map(j => j.id))
+}
+async function batchMatch() {
+  if (selectedIds.value.size === 0) { toast('error', '请先勾选要匹配的 JD'); return }
+  if (matching.value) return
+  matching.value = true
+  try {
+    const r = await api.post<any>('/api/ai/batch-match', { jd_ids: [...selectedIds.value] })
+    matchResults.value = r
+    matchPanelOpen.value = true
+    toast('success', `AI 匹配完成 ${r.matched}/${r.total}`)
+  } catch (e: any) { toast('error', e.message) }
+  matching.value = false
+}
+
 onMounted(load)
 </script>
 
@@ -113,6 +142,9 @@ onMounted(load)
         <button class="btn-ghost" @click="openTrends">📊 关键词趋势</button>
         <button class="btn-primary" :disabled="batchParsing" @click="batchParse">
           ⚡ 批量解析<span v-if="unparsedCount" class="ml-1 rounded bg-white/30 px-1.5 text-xs">{{ unparsedCount }}</span>
+        </button>
+        <button class="btn-primary" :disabled="matching || selectedIds.size === 0" @click="batchMatch">
+          🤖 一键匹配<span v-if="selectedIds.size" class="ml-1 rounded bg-white/30 px-1.5 text-xs">{{ selectedIds.size }}</span>
         </button>
         <button class="btn-primary" @click="openModal">+ 新建 JD</button>
       </div>
@@ -165,6 +197,7 @@ onMounted(load)
       <table class="w-full text-sm">
         <thead class="text-left text-slate-400">
           <tr class="border-b border-slate-100">
+            <th class="w-8 py-2"><input type="checkbox" :checked="selectedIds.size === parsedItems.length && parsedItems.length > 0" @change="toggleAll" /></th>
             <th class="py-2">公司</th>
             <th>岗位</th>
             <th>方向</th>
@@ -175,6 +208,7 @@ onMounted(load)
         </thead>
         <tbody>
           <tr v-for="j in parsedItems" :key="j.id" class="border-b border-slate-50 hover:bg-slate-50">
+            <td class="w-8"><input type="checkbox" :checked="selectedIds.has(j.id)" @change="toggleSelect(j.id)" /></td>
             <td class="py-2 font-medium">{{ j.company }}</td>
             <td>{{ j.title }}</td>
             <td>
@@ -301,6 +335,39 @@ onMounted(load)
 
         <div v-if="!trends.top?.length" class="py-4 text-center text-slate-400">
           暂无关键词数据，先批量解析几份 JD 后就能看到趋势。
+        </div>
+      </div>
+    </Modal>
+
+    <!-- 匹配结果面板 -->
+    <Modal v-model="matchPanelOpen" title="🤖 AI 匹配结果" width="56rem">
+      <div v-if="!matchResults" class="py-8 text-center text-slate-400">加载中...</div>
+      <div v-else class="space-y-4 max-h-[70vh] overflow-y-auto">
+        <div class="text-sm text-slate-500">
+          对比简历：<span class="font-medium text-slate-700">{{ matchResults.resume_version || '—' }}</span>
+          · 成功 <span class="text-emerald-600">{{ matchResults.matched }}</span> / {{ matchResults.total }}
+        </div>
+        <div v-for="r in matchResults.results" :key="r.jd_id" class="rounded-lg border border-slate-200 p-3">
+          <div class="flex items-center justify-between">
+            <div class="font-semibold text-slate-800">{{ r.company }} · {{ r.title }}</div>
+            <span v-if="r.ok" class="text-2xl font-bold" :class="r.score >= 75 ? 'text-emerald-600' : r.score >= 55 ? 'text-amber-600' : 'text-rose-600'">{{ r.score }}</span>
+            <span v-else class="text-xs text-rose-600">失败：{{ r.error }}</span>
+          </div>
+          <template v-if="r.ok">
+            <div v-if="r.matched_points?.length" class="mt-2 text-sm">
+              <div class="font-medium text-emerald-700">✅ 符合</div>
+              <ul class="list-disc pl-4 text-slate-600 space-y-0.5"><li v-for="(m, i) in r.matched_points" :key="i">{{ m }}</li></ul>
+            </div>
+            <div v-if="r.missing_points?.length" class="mt-2 text-sm">
+              <div class="font-medium text-rose-700">❌ 不符合</div>
+              <ul class="list-disc pl-4 text-slate-600 space-y-0.5"><li v-for="(m, i) in r.missing_points" :key="i">{{ m }}</li></ul>
+            </div>
+            <div v-if="r.resume_edits?.length" class="mt-2 rounded bg-blue-50 p-2 text-sm">
+              <div class="font-medium text-blue-700">📝 简历怎么改</div>
+              <ul class="list-disc pl-4 text-slate-700 space-y-0.5"><li v-for="(e, i) in r.resume_edits" :key="i">{{ e }}</li></ul>
+            </div>
+            <div v-if="r.suggestion" class="mt-2 text-sm text-slate-500">{{ r.suggestion }}</div>
+          </template>
         </div>
       </div>
     </Modal>

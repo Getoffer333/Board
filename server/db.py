@@ -87,6 +87,7 @@ _MIGRATIONS = [
     ("interview", "audio_path", "TEXT"),
     ("interview", "transcript", "TEXT"),
     ("interview", "ai_review", "TEXT"),
+    ("match_result", "resume_edits", "TEXT NOT NULL DEFAULT '[]'"),
 ]
 
 
