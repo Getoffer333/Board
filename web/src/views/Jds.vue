@@ -143,7 +143,7 @@ onMounted(load)
         <button class="btn-primary" :disabled="batchParsing" @click="batchParse">
           ⚡ 批量解析<span v-if="unparsedCount" class="ml-1 rounded bg-white/30 px-1.5 text-xs">{{ unparsedCount }}</span>
         </button>
-        <button class="btn-primary" :disabled="matching || selectedIds.size === 0" @click="batchMatch">
+        <button class="btn-primary" :disabled="matching" @click="batchMatch">
           🤖 一键匹配<span v-if="selectedIds.size" class="ml-1 rounded bg-white/30 px-1.5 text-xs">{{ selectedIds.size }}</span>
         </button>
         <button class="btn-primary" @click="openModal">+ 新建 JD</button>
@@ -192,7 +192,7 @@ onMounted(load)
     <div v-if="parsedItems.length" class="card overflow-x-auto">
       <div class="mb-2 flex items-center gap-2">
         <h3 class="font-semibold text-emerald-700">✅ 已解析</h3>
-        <span class="text-xs text-slate-400">{{ parsedItems.length }} 份</span>
+        <span class="text-xs text-slate-400">{{ parsedItems.length }} 份 · 勾选后可「🤖 一键匹配」</span>
       </div>
       <table class="w-full text-sm">
         <thead class="text-left text-slate-400">
