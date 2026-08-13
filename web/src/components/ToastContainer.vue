@@ -4,7 +4,8 @@ import { toasts } from '../toast'
 const COLORS: Record<string, string> = {
   success: 'bg-emerald-600',
   error: 'bg-rose-600',
-  info: 'bg-slate-700'
+  info: 'bg-slate-700',
+  warn: 'bg-amber-600'
 }
 </script>
 

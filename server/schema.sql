@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS jd (
   salary_range TEXT,
   raw_text TEXT,
   parsed_json TEXT NOT NULL DEFAULT '{}',
+  ai_parsed INTEGER NOT NULL DEFAULT 0,
+  direction_alert TEXT,
   status TEXT NOT NULL DEFAULT 'active',
   note TEXT,
   created_at TEXT NOT NULL,

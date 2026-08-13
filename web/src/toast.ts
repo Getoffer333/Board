@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 
-export type ToastType = 'success' | 'error' | 'info'
+export type ToastType = 'success' | 'error' | 'info' | 'warn'
 
 export const toasts = reactive<{ id: number; type: ToastType; msg: string }[]>([])
 

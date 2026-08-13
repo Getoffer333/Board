@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter
 
+from ..db import load_json
 from ..models import FUNNEL_ORDER, STATUS_LABELS
 from ..repositories.sqlite_repo import repo
 from ..services.reminder import build_reminders
@@ -253,4 +254,45 @@ def weekly_snapshot():
     return {
         "this_week": {"start": str(monday), "end": str(sunday), "applications": this_week_apps},
         "next_week": {"start": str(next_monday), "end": str(next_sunday), "interviews": next_week_interviews, "followups": next_week_followups},
+    }
+
+
+@router.get("/keyword-trends")
+def keyword_trends():
+    """关键词需求趋势：聚合所有 JD 的高频关键词，交叉对比简历标出「市场要但你缺」。"""
+    from collections import Counter
+
+    jds = repo("jd").list()
+    counter = Counter()
+    for jd in jds:
+        parsed = jd.get("parsed_json") or {}
+        if isinstance(parsed, str):
+            parsed = load_json(parsed, {})
+        for kw in parsed.get("keywords", []):
+            if kw:
+                counter[kw] += 1
+
+    # 简历语料（用于判断「你缺什么」）
+    resume_corpus = ""
+    for r in repo("resume").list():
+        resume_corpus += (r.get("content_text") or "") + "\n"
+        resume_corpus += (r.get("version_name") or "") + "\n"
+        for h in (r.get("highlights") or []):
+            resume_corpus += h + "\n"
+
+    top = counter.most_common(30)
+    matched = []
+    missing = []
+    for kw, cnt in top:
+        entry = {"keyword": kw, "count": cnt}
+        if kw.lower() in resume_corpus.lower():
+            matched.append(entry)
+        else:
+            missing.append(entry)
+
+    return {
+        "total_jds": len(jds),
+        "top": [{"keyword": k, "count": c} for k, c in top],
+        "matched": matched,
+        "missing": missing,
     }

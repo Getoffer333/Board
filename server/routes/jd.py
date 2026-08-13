@@ -1,10 +1,11 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from ..db import get_setting, load_json
 from ..models import BusinessError, DIRECTIONS, assert_in
 from ..repositories.sqlite_repo import repo
+from ..services.matcher import match
 from ..services.parser import guess_direction, guess_meta, parse_jd
-from ..db import load_json
 
 router = APIRouter(prefix="/api/jds", tags=["jd"])
 
@@ -40,6 +41,36 @@ def get_jd(jid: int):
     return item
 
 
+@router.get("/{jid}/analyze")
+def analyze_jd(jid: int):
+    """JD 详情分析：保留原文 + 基于求职者背景与简历做匹配分析。"""
+    jd = repo("jd").get(jid)
+    if not jd:
+        raise BusinessError("JD 不存在", 404)
+
+    resumes = [r for r in repo("resume").list() if r.get("is_active", 1)]
+    resume = resumes[0] if resumes else None
+
+    result = {
+        "jd": jd,
+        "resume_version": resume["version_name"] if resume else None,
+        "match": None,
+        "user": {
+            "primary_direction": get_setting("primary_direction", ""),
+            "backup_directions": load_json(get_setting("backup_directions", "[]"), []),
+            "years_experience": get_setting("years_experience", ""),
+            "education": get_setting("education", ""),
+            "current_city": get_setting("current_city", ""),
+        },
+    }
+    if resume:
+        try:
+            result["match"] = match(resume, jd)
+        except Exception:
+            result["match"] = None
+    return result
+
+
 @router.post("")
 def create_jd(payload: JdIn):
     d = payload.dict()
@@ -60,7 +91,29 @@ def create_jd(payload: JdIn):
         d["title"] = "待定岗位"
     if not d.get("company"):
         d["company"] = "待定公司"
-    return repo("jd").create(d, summary=f"新增 JD {d['company']} {d['title']}")
+
+    # 方向偏离预警（规则层）
+    primary = get_setting("primary_direction", "")
+    backups = load_json(get_setting("backup_directions", "[]"), [])
+    allowed = set([primary] + [b for b in backups if b])
+    if d["direction_tag"] and d["direction_tag"] != "其他" \
+            and allowed and d["direction_tag"] not in allowed:
+        d["direction_alert"] = (
+            f"方向偏离：该岗位为「{d['direction_tag']}」，"
+            f"你的求职方向是「{'/'.join(sorted(allowed))}」")
+
+    # 去重检测（同公司 + 同岗位）
+    duplicate = False
+    if d["company"] != "待定公司" and d["title"] != "待定岗位":
+        for j in repo("jd").list():
+            if j["company"] == d["company"] and j["title"] == d["title"]:
+                duplicate = True
+                break
+
+    created = repo("jd").create(d, summary=f"新增 JD {d['company']} {d['title']}")
+    if duplicate:
+        created["duplicate_warning"] = True
+    return created
 
 
 @router.put("/{jid}")

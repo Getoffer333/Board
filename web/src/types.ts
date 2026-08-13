@@ -30,6 +30,8 @@ export interface JD {
     education_required?: string | null
     highlights: string[]
   } | null
+  ai_parsed: number
+  direction_alert: string | null
   status: string
   note: string
   created_at: string

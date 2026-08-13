@@ -9,16 +9,16 @@ const router = useRouter()
 const bellOpen = ref(false)
 
 const menus = [
-  { path: '/dashboard', label: '驾驶舱', icon: '📊', v2: '增强' },
+  { path: '/dashboard', label: '驾驶舱', icon: '📊' },
   { path: '/resumes', label: '简历库', icon: '📄' },
   { path: '/jds', label: 'JD库', icon: '📋' },
   { path: '/applications', label: '投递看板', icon: '🚀' },
-  { path: '/scripts', label: '逐字稿', icon: '🎙️', v2: '新增' },
+  { path: '/scripts', label: '逐字稿', icon: '🎙️' },
   { path: '/interviews', label: '面试中心', icon: '🎤' },
   { path: '/skills', label: '技能提升', icon: '📈' },
   { path: '/contacts', label: '人脉内推', icon: '🤝' },
   { path: '/questions', label: '面试题库', icon: '❓' },
-  { path: '/ai', label: 'AI工具', icon: '🤖', v2: '增强' },
+  { path: '/ai', label: 'AI工具', icon: '🤖' },
   { path: '/settings', label: '设置', icon: '⚙️' }
 ]
 
@@ -51,7 +51,7 @@ function goOverdue(o: { entity: string; entity_id: number }) {
           class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
           active-class="!bg-indigo-600 !text-white"
         >
-          <span>{{ m.icon }}</span>{{ m.label }}<span v-if="m.v2" class="ml-auto text-[10px] rounded bg-indigo-100 px-1.5 py-0.5 text-indigo-600 font-bold">🆕{{ m.v2 }}</span>
+          <span>{{ m.icon }}</span>{{ m.label }}
         </RouterLink>
       </nav>
       <div class="border-t border-slate-100 px-5 py-3 text-xs text-slate-400">v2.0 · 本地数据</div>

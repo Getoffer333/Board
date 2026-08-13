@@ -11,7 +11,7 @@
 
 import json
 
-from ..db import get_setting
+from ..db import get_setting, load_json
 from ..models import DIRECTIONS, BusinessError
 
 
@@ -27,14 +27,26 @@ def _owner_intro() -> str:
     return "；".join(parts) if parts else "（未在设置中填写个人背景）"
 
 
+def _owner_direction() -> str:
+    """求职方向（主方向 + 备选方向），用于方向偏离预警。"""
+    primary = get_setting("primary_direction", "")
+    backups = load_json(get_setting("backup_directions", "[]"), [])
+    parts = [primary] if primary else []
+    parts += [b for b in backups if b]
+    return "/".join(parts) if parts else "未设置"
+
+
 def build_jd_parse_prompt(jd: dict) -> str:
     raw = jd.get("raw_text") or ""
     head = (f"公司：{jd.get('company') or '未知'}\n"
             f"岗位：{jd.get('title') or '未知'}\n"
             f"方向：{jd.get('direction_tag') or '未知'}")
+    direction = _owner_direction()
     return f"""你是一名招聘信息结构化助手。下面是一段 JD 原文（已带部分元信息）。
 
 {head}
+
+求职者的求职方向：{direction}
 
 --- JD 原文开始 ---
 {raw}
@@ -58,6 +70,7 @@ def build_jd_parse_prompt(jd: dict) -> str:
     "education_required": "学历要求或 null",
     "highlights": ["岗位亮点，如双休/期权/业务前景"]
   }},
+  "direction_alert": "若该岗位方向与求职者方向（{direction}）明显不符（如机械工程师、程序员等），写一句预警说明；否则留空字符串",
   "note": "其他需要记住的信息"
 }}
 """

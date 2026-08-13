@@ -44,6 +44,34 @@ def export_interview_q(payload: dict = Body(...)):
 
 
 # ─── 在线一键调用 ────────────────────────────────────────
+def _apply_jd_parse(jd_id: int, result: dict) -> dict:
+    """将 AI 解析结果回填到 JD，含方向偏离预警（AI 判断 + 规则兜底）。"""
+    primary = get_setting("primary_direction", "")
+    backups = load_json(get_setting("backup_directions", "[]"), [])
+    allowed = set([primary] + [b for b in backups if b])
+    direction = result.get("direction_tag", "")
+    rule_alert = ""
+    if direction and direction != "其他" and allowed and direction not in allowed:
+        rule_alert = f"方向偏离：该岗位为「{direction}」，你的求职方向是「{'/'.join(sorted(allowed))}」"
+    alert = (result.get("direction_alert") or "").strip() or rule_alert
+
+    jd = repo("jd").get(jd_id)
+    repo("jd").update(jd_id, {
+        "company": result.get("company") or jd.get("company") or "",
+        "title": result.get("title") or jd.get("title") or "",
+        "direction_tag": direction or jd.get("direction_tag") or "",
+        "url": result.get("url", ""),
+        "source": result.get("source", ""),
+        "location": result.get("location", ""),
+        "salary_range": result.get("salary_range", ""),
+        "parsed_json": result.get("parsed_json", {}),
+        "direction_alert": alert,
+        "note": result.get("note", ""),
+        "ai_parsed": 1,
+    }, summary="AI 在线解析 JD")
+    return repo("jd").get(jd_id)
+
+
 @router.post("/online-jd-parse")
 def online_jd_parse(payload: dict = Body(...)):
     """一键 JD 解析：LLM 直接调用 + 回填入库。"""
@@ -52,24 +80,37 @@ def online_jd_parse(payload: dict = Body(...)):
         raise BusinessError("JD 不存在", 404)
     if get_setting("llm_enabled", "0") != "1":
         raise BusinessError("在线模式未开启，请在设置中启用并配置 API Key")
-    prompt = build_jd_parse_prompt(jd)
     try:
-        result = call_llm_json(prompt)
+        result = call_llm_json(build_jd_parse_prompt(jd))
     except RuntimeError as e:
         raise BusinessError(str(e))
-    # 回填
-    repo("jd").update(jd["id"], {
-        "company": result.get("company", jd["company"]),
-        "title": result.get("title", jd["title"]),
-        "direction_tag": result.get("direction_tag", jd["direction_tag"]),
-        "url": result.get("url", ""),
-        "source": result.get("source", ""),
-        "location": result.get("location", ""),
-        "salary_range": result.get("salary_range", ""),
-        "parsed_json": result.get("parsed_json", {}),
-        "note": result.get("note", ""),
-    }, summary="AI 在线解析 JD")
-    return {"ok": True, "result": result}
+    updated = _apply_jd_parse(jd["id"], result)
+    return {"ok": True, "result": updated}
+
+
+@router.post("/batch-jd-parse")
+def batch_jd_parse():
+    """批量解析：找出所有已粘贴但未 AI 解析的 JD，逐个调用 LLM 解析。"""
+    if get_setting("llm_enabled", "0") != "1":
+        raise BusinessError("在线模式未开启，请在设置中启用并配置 API Key")
+    todos = [j for j in repo("jd").list()
+             if not j.get("ai_parsed") and (j.get("raw_text") or "").strip()]
+    if not todos:
+        return {"ok": True, "total": 0, "parsed": 0, "failed": 0,
+                "results": [], "message": "没有待解析的 JD"}
+    results = []
+    for jd in todos:
+        try:
+            result = call_llm_json(build_jd_parse_prompt(jd))
+            _apply_jd_parse(jd["id"], result)
+            results.append({"jd_id": jd["id"], "ok": True,
+                            "company": result.get("company", ""),
+                            "title": result.get("title", "")})
+        except Exception as e:
+            results.append({"jd_id": jd["id"], "ok": False, "error": str(e)})
+    ok = sum(1 for r in results if r["ok"])
+    return {"ok": True, "total": len(todos), "parsed": ok,
+            "failed": len(todos) - ok, "results": results}
 
 
 @router.post("/online-match")
