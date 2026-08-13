@@ -160,6 +160,9 @@ def online_match(payload: dict = Body(...)):
     return {
         "ok": True, "match_id": saved["id"],
         "score": result.get("score"), "suggestion": result.get("suggestion"),
+        "dimension_scores": result.get("dimension_scores", {}),
+        "matched_points": result.get("matched_points", []),
+        "missing_points": result.get("missing_points", []),
         "suggested_skills": suggest_skills_from_missing(result.get("missing_points", []), jd["direction_tag"]),
     }
 

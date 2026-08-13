@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import api from '../api'
 import { toast } from '../toast'
 import { DIRECTIONS } from '../constants'
@@ -27,6 +27,12 @@ function copy(text: string) {
 }
 
 const online = ref(settings.value?.llm_enabled === '1')
+
+// LLM 是否启用（宽松判断，兼容多种存储值）
+const llmEnabled = computed(() => {
+  const v = settings.value?.llm_enabled
+  return v === '1' || v === 1 || v === true || v === 'true' || v === 'on'
+})
 
 // 1) JD 解析
 const jdSel = ref('')
@@ -147,10 +153,10 @@ onMounted(load)
         <option v-for="j in jds" :key="j.id" :value="j.id">{{ j.company }} · {{ j.title }}</option>
       </select>
       <div class="flex gap-2">
-        <button class="btn-primary flex-1" @click="onlineJd" :disabled="settings?.llm_enabled !== '1'">🤖 一键解析</button>
+        <button class="btn-primary flex-1" @click="onlineJd" :disabled="!llmEnabled">🤖 一键解析</button>
         <button class="btn-ghost flex-1" @click="exportJd">📋 导出</button>
       </div>
-      <div v-if="settings?.llm_enabled !== '1'" class="text-xs text-amber-600">在线模式未开启（设置页配置 Key）</div>
+      <div v-if="!llmEnabled" class="text-xs text-amber-600">⚠️ 在线模式未开启，去「设置」页打开「启用 LLM」并保存</div>
       <textarea v-model="jdPrompt" rows="4" readonly class="input bg-slate-50" placeholder="导出的 prompt 将显示在此"></textarea>
       <button v-if="jdPrompt" class="btn-ghost w-full" @click="copy(jdPrompt)">复制 prompt</button>
       <div class="border-t border-slate-100 pt-3">
@@ -172,9 +178,10 @@ onMounted(load)
         <option v-for="r in resumes" :key="r.id" :value="r.id">{{ r.version_name }}</option>
       </select>
       <div class="flex gap-2">
-        <button class="btn-primary flex-1" @click="matchOnline" :disabled="settings?.llm_enabled !== '1'">🤖 在线匹配</button>
+        <button class="btn-primary flex-1" @click="matchOnline" :disabled="!llmEnabled">🤖 在线匹配</button>
         <button class="btn-ghost flex-1" @click="matchLocal">⚡ 本地匹配</button>
       </div>
+      <div v-if="!llmEnabled" class="text-xs text-amber-600">⚠️ 在线模式未开启，去「设置」页打开「启用 LLM」并保存</div>
       <button class="btn-ghost w-full text-xs" @click="exportMatch">📋 导出 prompt</button>
       <textarea v-model="mPrompt" rows="3" readonly class="input bg-slate-50" placeholder="导出的 prompt 显示在此"></textarea>
       <button v-if="mPrompt" class="btn-ghost w-full" @click="copy(mPrompt)">复制 prompt</button>
@@ -206,9 +213,10 @@ onMounted(load)
         <option v-for="d in DIRECTIONS" :key="d" :value="d">{{ d }}</option>
       </select>
       <div class="flex gap-2">
-        <button class="btn-primary flex-1" @click="onlineQ" :disabled="settings?.llm_enabled !== '1'">🤖 一键生成</button>
+        <button class="btn-primary flex-1" @click="onlineQ" :disabled="!llmEnabled">🤖 一键生成</button>
         <button class="btn-ghost flex-1" @click="exportQ">📋 导出</button>
       </div>
+      <div v-if="!llmEnabled" class="text-xs text-amber-600">⚠️ 在线模式未开启，去「设置」页打开「启用 LLM」并保存</div>
       <textarea v-model="qPrompt" rows="4" readonly class="input bg-slate-50" placeholder="导出的 prompt 将显示在此"></textarea>
       <button v-if="qPrompt" class="btn-ghost w-full" @click="copy(qPrompt)">复制 prompt</button>
       <div class="border-t border-slate-100 pt-3">
