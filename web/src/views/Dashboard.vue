@@ -5,6 +5,7 @@ import api from '../api'
 import { toast } from '../toast'
 import { refreshOverdue, store } from '../store'
 import { LEVEL_COLORS, STATUS_LABELS } from '../constants'
+import JDDetailModal from '../components/JDDetailModal.vue'
 import type { SummaryStat, FunnelStat, DirectionStat, ResumeVersionStat, Overdue, TimelineItem, JDRecommendation, WeeklySnapshot } from '../types'
 
 const summary = ref<SummaryStat | null>(null)
@@ -15,6 +16,11 @@ const overdue = ref<Overdue[]>([])
 const timeline = ref<TimelineItem[]>([])
 const jdRecs = ref<JDRecommendation[]>([])
 const weekly = ref<WeeklySnapshot | null>(null)
+
+const detailJdId = ref<number | null>(null)
+function openJdDetail(jdId: number) {
+  detailJdId.value = jdId
+}
 
 const funnelEl = ref<HTMLElement | null>(null)
 const barEl = ref<HTMLElement | null>(null)
@@ -163,7 +169,10 @@ onBeforeUnmount(() => {
             {{ r.match_score || '-' }}
           </span>
           <div class="flex-1 min-w-0">
-            <div class="font-medium truncate">{{ r.company }} · {{ r.title }}</div>
+            <div class="font-medium truncate">
+              <button class="cursor-pointer text-indigo-600 hover:underline" @click="openJdDetail(r.jd_id)">{{ r.company }}</button>
+              <span class="text-slate-700"> · {{ r.title }}</span>
+            </div>
             <div class="text-xs text-slate-400">{{ r.direction }} · {{ r.location }} · {{ r.salary }}</div>
           </div>
           <span v-if="r.applied" class="badge bg-blue-50 text-blue-600 text-xs">已投</span>
@@ -231,5 +240,8 @@ onBeforeUnmount(() => {
         </li>
       </ul>
     </div>
+
+    <!-- JD 详情弹窗 -->
+    <JDDetailModal v-model:jdId="detailJdId" @changed="load" />
   </div>
 </template>

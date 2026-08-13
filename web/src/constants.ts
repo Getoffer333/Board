@@ -2,6 +2,7 @@
 export const STATUSES = ['intention', 'applied', 'written', 'interview', 'offer', 'closed']
 
 export const STATUS_LABELS: Record<string, string> = {
+  active: '待处理',
   intention: '意向',
   applied: '已投递',
   written: '笔试/测评',

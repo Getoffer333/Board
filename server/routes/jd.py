@@ -126,6 +126,18 @@ def update_jd(jid: int, payload: JdIn):
     return repo("jd").update(jid, d)
 
 
+@router.post("/{jid}/mark-intention")
+def mark_intention(jid: int):
+    """一键标为意向 / 取消意向（切换）。"""
+    jd = repo("jd").get(jid)
+    if not jd:
+        raise BusinessError("JD 不存在", 404)
+    new_status = "active" if jd.get("status") == "intention" else "intention"
+    repo("jd").update(jid, {"status": new_status},
+                      summary=f"JD {jid} {'标为意向' if new_status == 'intention' else '取消意向'}")
+    return {"ok": True, "status": new_status}
+
+
 @router.delete("/{jid}")
 def delete_jd(jid: int):
     if repo("application").count("jd_id=?", (jid,)) > 0:
