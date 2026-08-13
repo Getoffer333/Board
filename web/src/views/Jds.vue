@@ -361,7 +361,8 @@ onMounted(load)
           <div class="flex items-center justify-between">
             <div class="font-semibold text-slate-800">
               {{ r.company }} · {{ r.title }}
-              <span v-if="r.reused" class="ml-1 text-xs font-normal text-slate-400">♻️ 复用上次结果</span>
+              <span v-if="r.reused && r.reused_source === 'online'" class="ml-1 text-xs font-normal text-slate-400">♻️ 复用 AI 结果</span>
+              <span v-else-if="r.reused" class="ml-1 text-xs font-normal text-amber-500">⚠️ 复用本地结果（要 AI 分析请勾「强制重匹配」）</span>
             </div>
             <span v-if="r.ok" class="text-2xl font-bold" :class="r.score >= 75 ? 'text-emerald-600' : r.score >= 55 ? 'text-amber-600' : 'text-rose-600'">{{ r.score }}</span>
             <span v-else class="text-xs text-rose-600">失败：{{ r.error }}</span>

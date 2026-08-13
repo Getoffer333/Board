@@ -192,18 +192,18 @@ def batch_match(payload: dict = Body(...)):
     if not jds:
         raise BusinessError("没有可匹配的 JD")
 
-    # ── 去重：已匹配过的复用结果，只对新 JD 调 AI ──
+    # ── 去重：有匹配结果（AI 或本地）就复用，只对真正没结果的 JD 调 AI ──
     reused_results = []
     to_match = []
     for jd in jds:
         existing = repo("match_result").raw(
-            "SELECT * FROM match_result WHERE jd_id=? AND resume_id=? AND source='online' ORDER BY id DESC LIMIT 1",
+            "SELECT * FROM match_result WHERE jd_id=? AND resume_id=? ORDER BY id DESC LIMIT 1",
             (jd["id"], resume["id"]))
         if existing and not force:
             r = existing[0]
             reused_results.append({
                 "jd_id": jd["id"], "company": jd["company"], "title": jd["title"],
-                "ok": True, "reused": True,
+                "ok": True, "reused": True, "reused_source": r["source"],
                 "score": r["score"],
                 "dimension_scores": load_json(r["dimension_scores"], {}),
                 "matched_points": load_json(r["matched_points"], []),
