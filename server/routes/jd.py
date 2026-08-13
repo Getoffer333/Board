@@ -30,6 +30,15 @@ def list_jds(status: str = "", direction: str = ""):
         apps = [a for a in apps if a["status"] == status]
     if direction:
         apps = [a for a in apps if a["direction_tag"] == direction]
+
+    # 附加匹配评分（取该 JD 的最佳匹配分，0 = 未匹配）
+    matches = repo("match_result").list()
+    for jd in apps:
+        best = 0
+        for m in matches:
+            if m["jd_id"] == jd["id"] and m["score"] > best:
+                best = m["score"]
+        jd["match_score"] = best
     return apps
 
 

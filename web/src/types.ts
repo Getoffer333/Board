@@ -32,6 +32,7 @@ export interface JD {
   } | null
   ai_parsed: number
   direction_alert: string | null
+  match_score: number
   status: string
   note: string
   created_at: string

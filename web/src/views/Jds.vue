@@ -26,6 +26,19 @@ const unparsedCount = computed(() =>
 const pendingItems = computed(() => items.value.filter(j => !j.ai_parsed))
 const parsedItems = computed(() => items.value.filter(j => !!j.ai_parsed))
 
+// 匹配评分排序
+const sortByScore = ref<'asc' | 'desc' | null>(null)
+function toggleSort() {
+  sortByScore.value = sortByScore.value === 'desc' ? 'asc' : 'desc'
+}
+function sortList(list: JD[]): JD[] {
+  if (!sortByScore.value) return list
+  const dir = sortByScore.value === 'desc' ? -1 : 1
+  return [...list].sort((a, b) => dir * ((a.match_score || 0) - (b.match_score || 0)))
+}
+const sortedPendingItems = computed(() => sortList(pendingItems.value))
+const sortedParsedItems = computed(() => sortList(parsedItems.value))
+
 async function load() {
   try {
     items.value = await api.get<JD[]>('/api/jds?status=&direction=')
@@ -169,16 +182,21 @@ onMounted(load)
             <th>岗位</th>
             <th>方向</th>
             <th>薪资</th>
+            <th>匹配评分</th>
             <th>状态</th>
             <th class="text-right">操作</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="j in pendingItems" :key="j.id" class="border-b border-slate-50 hover:bg-slate-50">
+          <tr v-for="j in sortedPendingItems" :key="j.id" class="border-b border-slate-50 hover:bg-slate-50">
             <td class="py-2 font-medium"><button class="cursor-pointer text-indigo-600 hover:underline" @click="openDetail(j)">{{ j.company }}</button></td>
             <td>{{ j.title }}</td>
             <td>{{ j.direction_tag || '—' }}</td>
             <td class="text-slate-500">{{ j.salary_range || '—' }}</td>
+            <td>
+              <span v-if="j.match_score" class="font-semibold" :class="j.match_score >= 75 ? 'text-emerald-600' : j.match_score >= 55 ? 'text-amber-600' : 'text-slate-400'">{{ j.match_score }}</span>
+              <span v-else class="text-slate-300">—</span>
+            </td>
             <td>{{ STATUS_LABELS[j.status] || j.status }}</td>
             <td class="text-right">
               <button class="btn-ghost mr-1" @click="openDetail(j)">详情</button>
@@ -204,12 +222,18 @@ onMounted(load)
             <th>岗位</th>
             <th>方向</th>
             <th>薪资</th>
+            <th class="cursor-pointer select-none whitespace-nowrap" title="点击按匹配评分排序" @click="toggleSort">
+              匹配评分
+              <span v-if="sortByScore === 'desc'">↓</span>
+              <span v-else-if="sortByScore === 'asc'">↑</span>
+              <span v-else class="text-slate-300">↕</span>
+            </th>
             <th>状态</th>
             <th class="text-right">操作</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="j in parsedItems" :key="j.id" class="border-b border-slate-50 hover:bg-slate-50">
+          <tr v-for="j in sortedParsedItems" :key="j.id" class="border-b border-slate-50 hover:bg-slate-50">
             <td class="w-8"><input type="checkbox" :checked="selectedIds.has(j.id)" @change="toggleSelect(j.id)" /></td>
             <td class="py-2 font-medium"><button class="cursor-pointer text-indigo-600 hover:underline" @click="openDetail(j)">{{ j.company }}</button></td>
             <td>{{ j.title }}</td>
@@ -220,6 +244,10 @@ onMounted(load)
               </span>
             </td>
             <td class="text-slate-500">{{ j.salary_range || '—' }}</td>
+            <td>
+              <span v-if="j.match_score" class="font-semibold" :class="j.match_score >= 75 ? 'text-emerald-600' : j.match_score >= 55 ? 'text-amber-600' : 'text-slate-400'">{{ j.match_score }}</span>
+              <span v-else class="text-slate-300">—</span>
+            </td>
             <td>{{ STATUS_LABELS[j.status] || j.status }}</td>
             <td class="text-right">
               <button class="btn-ghost mr-1" @click="openDetail(j)">详情</button>
