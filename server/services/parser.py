@@ -130,14 +130,52 @@ def guess_meta(text: str) -> dict:
             meta["location"] = city
             break
 
-    for line in lines[:6]:
-        if not meta["company"] and re.search(r"(公司|集团|科技|有限|网络|信息|股份)", line) \
-                and len(line) <= 30:
-            meta["company"] = line
-        if not meta["title"] and re.search(
-            r"(运营|销售|市场|品牌|增长|营销|商务|BD|渠道|经理|专家|总监|主管)", line
-        ) and len(line) <= 30:
-            meta["title"] = line
+    # ---- 公司名识别（多层策略）----
+    # 1) 显式标签：公司名/公司：/公司名称/【公司】
+    for line in lines[:20]:
+        m = re.search(r"(?:公司名[称]?|公司)\s*[:：]\s*(.{2,30})", line)
+        if m:
+            meta["company"] = m.group(1).strip()
+            break
+    # 2) 常见公司后缀（科技/集团/有限/网络/信息/股份/文化/传媒/咨询/教育/数据/智能/软件/互联网/电子/贸易/实业）
+    if not meta["company"]:
+        for line in lines[:20]:
+            if len(line) <= 30 and re.search(
+                r"(公司|集团|科技|网络|信息|股份|文化|传媒|咨询|教育|数据|智能|软件|互联网|电子|贸易|实业|电商)",
+                line
+            ) and not re.search(r"(岗位|职责|要求|任职|学历|经验|薪资|福利|周末|五险|负责|本科|大专|硕士)", line):
+                meta["company"] = line
+                break
+    # 3) 首行短句启发：第一行短、无岗位动词、无标点，可能是公司名
+    if not meta["company"] and lines:
+        first = lines[0]
+        if len(first) <= 12 and not re.search(r"(运营|销售|市场|品牌|经理|总监|主管|工程师|设计师|顾问|专员|助理)", first):
+            # 如果第二行是明显岗位名，则首行大概率是公司
+            if len(lines) > 1 and re.search(r"(运营|销售|市场|品牌|经理|总监|主管|工程师|设计师|顾问|专员|助理|管培)", lines[1]):
+                meta["company"] = first
+
+    # ---- 岗位名识别 ----
+    if not meta["title"]:
+        # 显式标签
+        for line in lines[:20]:
+            m = re.search(r"(?:岗位|职位|岗位名[称]?|职位名[称]?)\s*[:：]\s*(.{2,30})", line)
+            if m:
+                meta["title"] = m.group(1).strip()
+                break
+    if not meta["title"]:
+        for line in lines[:8]:
+            if len(line) <= 30 and re.search(
+                r"(运营|销售|市场|品牌|增长|营销|商务|BD|渠道|经理|专家|总监|主管|工程师|设计师|顾问|专员|助理|管培|策划|编辑|主播|达人|讲师)",
+                line
+            ) and not re.search(r"(岗位职责|工作职责|任职要求|我们希望你|负责|职责描述)", line):
+                meta["title"] = line
+                break
+
+    # 清理公司名里可能夹带的杂质
+    if meta["company"]:
+        meta["company"] = meta["company"].strip("【】[]（）() \t")
+    if meta["title"]:
+        meta["title"] = meta["title"].strip("【】[]（）() \t")
     return meta
 
 
