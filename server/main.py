@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .db import init_db
+from .db import init_db, migrate_db
 from .models import BusinessError
 from .routes import (
     ai,
@@ -32,6 +32,7 @@ app = FastAPI(title="个人求职工作台")
 @app.on_event("startup")
 def _startup() -> None:
     init_db()
+    migrate_db()
 
 
 app.add_middleware(

@@ -21,6 +21,10 @@ const unparsedCount = computed(() =>
   items.value.filter(j => !j.ai_parsed && (j.raw_text || '').trim()).length
 )
 
+// 列表分区：待解析（上）/ 已解析（下）
+const pendingItems = computed(() => items.value.filter(j => !j.ai_parsed))
+const parsedItems = computed(() => items.value.filter(j => !!j.ai_parsed))
+
 async function load() {
   try {
     items.value = await api.get<JD[]>('/api/jds?status=&direction=')
@@ -118,7 +122,46 @@ onMounted(load)
       {{ batchProgress }}
     </div>
 
+    <!-- 待解析区 -->
     <div class="card overflow-x-auto">
+      <div class="mb-2 flex items-center gap-2">
+        <h3 class="font-semibold text-amber-700">⏳ 待解析</h3>
+        <span class="text-xs text-slate-400">{{ pendingItems.length }} 份</span>
+      </div>
+      <table v-if="pendingItems.length" class="w-full text-sm">
+        <thead class="text-left text-slate-400">
+          <tr class="border-b border-slate-100">
+            <th class="py-2">公司</th>
+            <th>岗位</th>
+            <th>方向</th>
+            <th>薪资</th>
+            <th>状态</th>
+            <th class="text-right">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="j in pendingItems" :key="j.id" class="border-b border-slate-50 hover:bg-slate-50">
+            <td class="py-2 font-medium">{{ j.company }}</td>
+            <td>{{ j.title }}</td>
+            <td>{{ j.direction_tag || '—' }}</td>
+            <td class="text-slate-500">{{ j.salary_range || '—' }}</td>
+            <td>{{ STATUS_LABELS[j.status] || j.status }}</td>
+            <td class="text-right">
+              <button class="btn-ghost mr-1" @click="openDetail(j)">详情</button>
+              <button class="btn-danger" @click="remove(j)">删除</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-else class="py-4 text-center text-sm text-slate-400">没有待解析的 JD 🎉</div>
+    </div>
+
+    <!-- 已解析区 -->
+    <div v-if="parsedItems.length" class="card overflow-x-auto">
+      <div class="mb-2 flex items-center gap-2">
+        <h3 class="font-semibold text-emerald-700">✅ 已解析</h3>
+        <span class="text-xs text-slate-400">{{ parsedItems.length }} 份</span>
+      </div>
       <table class="w-full text-sm">
         <thead class="text-left text-slate-400">
           <tr class="border-b border-slate-100">
@@ -126,13 +169,12 @@ onMounted(load)
             <th>岗位</th>
             <th>方向</th>
             <th>薪资</th>
-            <th>解析</th>
             <th>状态</th>
             <th class="text-right">操作</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="j in items" :key="j.id" class="border-b border-slate-50 hover:bg-slate-50">
+          <tr v-for="j in parsedItems" :key="j.id" class="border-b border-slate-50 hover:bg-slate-50">
             <td class="py-2 font-medium">{{ j.company }}</td>
             <td>{{ j.title }}</td>
             <td>
@@ -142,19 +184,11 @@ onMounted(load)
               </span>
             </td>
             <td class="text-slate-500">{{ j.salary_range || '—' }}</td>
-            <td>
-              <span v-if="j.ai_parsed" class="badge bg-emerald-100 text-emerald-700">已解析</span>
-              <span v-else-if="j.raw_text" class="badge bg-amber-100 text-amber-700">待解析</span>
-              <span v-else class="text-slate-300">—</span>
-            </td>
             <td>{{ STATUS_LABELS[j.status] || j.status }}</td>
             <td class="text-right">
               <button class="btn-ghost mr-1" @click="openDetail(j)">详情</button>
               <button class="btn-danger" @click="remove(j)">删除</button>
             </td>
-          </tr>
-          <tr v-if="items.length === 0">
-            <td colspan="7" class="py-6 text-center text-slate-400">暂无 JD</td>
           </tr>
         </tbody>
       </table>
@@ -178,12 +212,6 @@ onMounted(load)
         <!-- 方向预警 -->
         <div v-if="detail.jd.direction_alert" class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-700">
           ⚠️ {{ detail.jd.direction_alert }}
-        </div>
-
-        <!-- 原文 -->
-        <div v-if="detail.jd.raw_text">
-          <h4 class="mb-1 font-semibold text-slate-700">📄 原文</h4>
-          <div class="max-h-48 overflow-y-auto rounded bg-slate-50 p-3 text-sm text-slate-600 whitespace-pre-wrap">{{ detail.jd.raw_text }}</div>
         </div>
 
         <!-- 结构化解析 -->

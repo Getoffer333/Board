@@ -78,3 +78,25 @@ def load_json(text, fallback):
         return json.loads(text)
     except (json.JSONDecodeError, TypeError):
         return fallback
+
+
+# 历史版本新增的字段（表, 列名, DDL），启动时自动补齐
+_MIGRATIONS = [
+    ("jd", "ai_parsed", "INTEGER NOT NULL DEFAULT 0"),
+    ("jd", "direction_alert", "TEXT"),
+    ("interview", "audio_path", "TEXT"),
+    ("interview", "transcript", "TEXT"),
+    ("interview", "ai_review", "TEXT"),
+]
+
+
+def migrate_db() -> None:
+    """轻量自动迁移：为旧库补齐缺失的列，避免手动 ALTER TABLE。"""
+    with get_conn() as conn:
+        for table, col, ddl in _MIGRATIONS:
+            try:
+                cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+            except sqlite3.Error:
+                continue  # 表还不存在，交给 init_db 建表
+            if col not in cols:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
