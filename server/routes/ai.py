@@ -171,12 +171,13 @@ def online_match(payload: dict = Body(...)):
 
 @router.post("/batch-match")
 def batch_match(payload: dict = Body(...)):
-    """批量匹配：对勾选的多个 JD 用激活简历并行做 AI 匹配。"""
+    """批量匹配：对勾选的多个 JD 用激活简历做 AI 匹配。已匹配过的直接复用结果（去重）。"""
     if get_setting("llm_enabled", "0") != "1":
         raise BusinessError("在线模式未开启，请在设置中启用并配置 API Key")
     jd_ids = payload.get("jd_ids") or []
     if not jd_ids:
         raise BusinessError("请先勾选要匹配的 JD")
+    force = bool(payload.get("force", False))  # 强制重新匹配
 
     resume_id = payload.get("resume_id")
     resume = repo("resume").get(resume_id) if resume_id else None
@@ -191,6 +192,28 @@ def batch_match(payload: dict = Body(...)):
     if not jds:
         raise BusinessError("没有可匹配的 JD")
 
+    # ── 去重：已匹配过的复用结果，只对新 JD 调 AI ──
+    reused_results = []
+    to_match = []
+    for jd in jds:
+        existing = repo("match_result").raw(
+            "SELECT * FROM match_result WHERE jd_id=? AND resume_id=? AND source='online' ORDER BY id DESC LIMIT 1",
+            (jd["id"], resume["id"]))
+        if existing and not force:
+            r = existing[0]
+            reused_results.append({
+                "jd_id": jd["id"], "company": jd["company"], "title": jd["title"],
+                "ok": True, "reused": True,
+                "score": r["score"],
+                "dimension_scores": load_json(r["dimension_scores"], {}),
+                "matched_points": load_json(r["matched_points"], []),
+                "missing_points": load_json(r["missing_points"], []),
+                "resume_edits": load_json(r.get("resume_edits"), []),
+                "suggestion": r.get("suggestion", ""),
+            })
+        else:
+            to_match.append(jd)
+
     from concurrent.futures import ThreadPoolExecutor
 
     def _match_one(jd):
@@ -200,42 +223,48 @@ def batch_match(payload: dict = Body(...)):
         except Exception as e:
             return jd, None, str(e)
 
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        fetched = list(pool.map(_match_one, jds))
+    fresh_results = []
+    if to_match:
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            fetched = list(pool.map(_match_one, to_match))
 
-    results = []
-    for jd, result, err in fetched:
-        if err:
-            results.append({"jd_id": jd["id"], "company": jd["company"],
-                            "title": jd["title"], "ok": False, "error": err})
-        else:
-            repo("match_result").raw(
-                "DELETE FROM match_result WHERE jd_id=? AND resume_id=?",
-                (jd["id"], resume["id"]))
-            repo("match_result").create({
-                "jd_id": jd["id"], "resume_id": resume["id"],
-                "score": result.get("score", 0),
-                "dimension_scores": result.get("dimension_scores", {}),
-                "matched_points": result.get("matched_points", []),
-                "missing_points": result.get("missing_points", []),
-                "resume_edits": result.get("resume_edits", []),
-                "suggestion": result.get("suggestion", ""),
-                "source": "online",
-            }, summary="AI 批量匹配")
-            results.append({
-                "jd_id": jd["id"], "company": jd["company"], "title": jd["title"],
-                "ok": True, "score": result.get("score", 0),
-                "dimension_scores": result.get("dimension_scores", {}),
-                "matched_points": result.get("matched_points", []),
-                "missing_points": result.get("missing_points", []),
-                "resume_edits": result.get("resume_edits", []),
-                "suggestion": result.get("suggestion", ""),
-            })
+        for jd, result, err in fetched:
+            if err:
+                fresh_results.append({"jd_id": jd["id"], "company": jd["company"],
+                                      "title": jd["title"], "ok": False, "error": err})
+            else:
+                repo("match_result").raw(
+                    "DELETE FROM match_result WHERE jd_id=? AND resume_id=?",
+                    (jd["id"], resume["id"]))
+                repo("match_result").create({
+                    "jd_id": jd["id"], "resume_id": resume["id"],
+                    "score": result.get("score", 0),
+                    "dimension_scores": result.get("dimension_scores", {}),
+                    "matched_points": result.get("matched_points", []),
+                    "missing_points": result.get("missing_points", []),
+                    "resume_edits": result.get("resume_edits", []),
+                    "suggestion": result.get("suggestion", ""),
+                    "source": "online",
+                }, summary="AI 批量匹配")
+                fresh_results.append({
+                    "jd_id": jd["id"], "company": jd["company"], "title": jd["title"],
+                    "ok": True, "reused": False, "score": result.get("score", 0),
+                    "dimension_scores": result.get("dimension_scores", {}),
+                    "matched_points": result.get("matched_points", []),
+                    "missing_points": result.get("missing_points", []),
+                    "resume_edits": result.get("resume_edits", []),
+                    "suggestion": result.get("suggestion", ""),
+                })
+
+    # 合并，按勾选顺序排序
+    results = reused_results + fresh_results
+    order = {i: idx for idx, i in enumerate(jd_ids)}
+    results.sort(key=lambda x: order.get(x["jd_id"], 99999))
 
     ok = sum(1 for r in results if r["ok"])
     return {"ok": True, "total": len(jds), "matched": ok,
-            "failed": len(jds) - ok, "results": results,
-            "resume_version": resume.get("version_name")}
+            "failed": len(jds) - ok, "reused": len(reused_results),
+            "results": results, "resume_version": resume.get("version_name")}
 
 
 @router.post("/online-interview-q")

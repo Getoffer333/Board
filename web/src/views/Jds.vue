@@ -107,6 +107,7 @@ const selectedIds = ref<Set<number>>(new Set())
 const matchPanelOpen = ref(false)
 const matchResults = ref<any>(null)
 const matching = ref(false)
+const forceMatch = ref(false)
 
 function toggleSelect(id: number) {
   const s = new Set(selectedIds.value)
@@ -122,12 +123,12 @@ async function batchMatch() {
   if (selectedIds.value.size === 0) { toast('error', '请先勾选要匹配的 JD'); return }
   if (matching.value) return
   matching.value = true
-  toast('info', `开始 AI 匹配 ${selectedIds.value.size} 个 JD，约需 1-2 分钟...`)
+  toast('info', forceMatch.value ? '强制重新匹配中，约需 1-2 分钟...' : `开始 AI 匹配 ${selectedIds.value.size} 个 JD（已匹配过的自动复用），约需 1-2 分钟...`)
   try {
-    const r = await api.post<any>('/api/ai/batch-match', { jd_ids: [...selectedIds.value] })
+    const r = await api.post<any>('/api/ai/batch-match', { jd_ids: [...selectedIds.value], force: forceMatch.value })
     matchResults.value = r
     matchPanelOpen.value = true
-    toast('success', `AI 匹配完成 ${r.matched}/${r.total}`)
+    toast('success', `匹配完成 ${r.matched}/${r.total}${r.reused ? `（复用 ${r.reused} 个）` : ''}`)
   } catch (e: any) { toast('error', e.message) }
   matching.value = false
 }
@@ -147,6 +148,9 @@ onMounted(load)
         <button class="btn-primary" :disabled="matching" @click="batchMatch">
           🤖 一键匹配<span v-if="selectedIds.size" class="ml-1 rounded bg-white/30 px-1.5 text-xs">{{ selectedIds.size }}</span>
         </button>
+        <label class="flex cursor-pointer items-center gap-1 text-xs text-slate-500" title="简历更新后勾选此项可重新匹配">
+          <input type="checkbox" v-model="forceMatch" class="accent-rose-500" /> 强制重匹配
+        </label>
         <button class="btn-primary" @click="openModal">+ 新建 JD</button>
       </div>
     </div>
@@ -351,10 +355,14 @@ onMounted(load)
         <div class="text-sm text-slate-500">
           对比简历：<span class="font-medium text-slate-700">{{ matchResults.resume_version || '—' }}</span>
           · 成功 <span class="text-emerald-600">{{ matchResults.matched }}</span> / {{ matchResults.total }}
+          <span v-if="matchResults.reused" class="text-slate-400"> · ♻️ 复用 {{ matchResults.reused }} 个</span>
         </div>
         <div v-for="r in matchResults.results" :key="r.jd_id" class="rounded-lg border border-slate-200 p-3">
           <div class="flex items-center justify-between">
-            <div class="font-semibold text-slate-800">{{ r.company }} · {{ r.title }}</div>
+            <div class="font-semibold text-slate-800">
+              {{ r.company }} · {{ r.title }}
+              <span v-if="r.reused" class="ml-1 text-xs font-normal text-slate-400">♻️ 复用上次结果</span>
+            </div>
             <span v-if="r.ok" class="text-2xl font-bold" :class="r.score >= 75 ? 'text-emerald-600' : r.score >= 55 ? 'text-amber-600' : 'text-rose-600'">{{ r.score }}</span>
             <span v-else class="text-xs text-rose-600">失败：{{ r.error }}</span>
           </div>
