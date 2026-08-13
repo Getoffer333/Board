@@ -144,13 +144,20 @@ onMounted(load)
     <div class="card space-y-3">
       <h3 class="font-semibold text-slate-700">数据备份</h3>
       <button class="btn-primary" @click="doExport">生成备份</button>
-      <div v-if="backupExport" class="rounded bg-slate-50 p-2 text-xs text-slate-500">
-        JSON: {{ (backupExport.json || '').length }} 字符 · XLSX: {{ (backupExport.xlsx || '').length }} 字符 · 大小 {{ backupExport.size }} 字节
+      <div v-if="backupExport" class="space-y-2 rounded bg-slate-50 p-3 text-sm">
+        <div class="text-slate-600">已生成备份（{{ (backupExport.size / 1024).toFixed(1) }} KB）</div>
+        <div class="flex flex-wrap gap-2">
+          <a class="btn-ghost" :href="`/api/backup/download/${backupExport.json}`" download>⬇️ 下载 JSON</a>
+          <a class="btn-ghost" :href="`/api/backup/download/${backupExport.xlsx}`" download>⬇️ 下载 XLSX</a>
+        </div>
       </div>
       <ul class="text-sm">
-        <li v-for="b in backups" :key="b.name" class="flex justify-between border-b border-slate-50 py-1">
-          <span>{{ b.name }}</span>
-          <span class="text-slate-400">{{ b.size }} 字节 · {{ b.time }}</span>
+        <li v-for="b in backups" :key="b.name" class="flex items-center justify-between border-b border-slate-50 py-1">
+          <span class="truncate">{{ b.name }}</span>
+          <span class="flex shrink-0 items-center gap-2">
+            <span class="text-slate-400">{{ (b.size / 1024).toFixed(1) }} KB</span>
+            <a class="btn-ghost text-xs" :href="`/api/backup/download/${b.name}`" download>⬇️ 下载</a>
+          </span>
         </li>
         <li v-if="!backups.length" class="text-slate-400">暂无备份文件</li>
       </ul>

@@ -102,6 +102,8 @@ async function markIntention() {
               {{ detail.match.score }}
             </span>
             <span class="text-sm text-slate-500">/ 100 匹配分</span>
+            <span v-if="detail.match.source === 'online'" class="badge bg-indigo-100 text-indigo-700">AI 匹配</span>
+            <span v-else-if="detail.match.source === 'local'" class="badge bg-slate-100 text-slate-600">本地匹配</span>
           </div>
           <div v-if="detail.match.matched_points?.length" class="mt-2 text-sm">
             <div class="font-medium text-emerald-700">✅ 已命中</div>
@@ -114,6 +116,12 @@ async function markIntention() {
             <div class="mt-1 flex flex-wrap gap-1">
               <span v-for="k in detail.match.missing_points" :key="k" class="badge bg-rose-100 text-rose-700">{{ k }}</span>
             </div>
+          </div>
+          <div v-if="detail.match.resume_edits?.length" class="mt-2 rounded bg-blue-50 p-2 text-sm">
+            <div class="font-medium text-blue-700">📝 简历怎么改</div>
+            <ul class="mt-1 list-disc space-y-0.5 pl-4 text-slate-700">
+              <li v-for="(e, i) in detail.match.resume_edits" :key="i">{{ e }}</li>
+            </ul>
           </div>
           <div v-if="detail.match.suggestion" class="mt-2 rounded bg-white p-2 text-sm text-slate-600">{{ detail.match.suggestion }}</div>
         </template>

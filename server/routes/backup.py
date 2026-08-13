@@ -3,9 +3,11 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter
+from fastapi.responses import FileResponse
 from openpyxl import Workbook
 
 from ..db import BACKUP_DIR
+from ..models import BusinessError
 
 router = APIRouter(prefix="/api/backup", tags=["backup"])
 
@@ -51,4 +53,18 @@ def list_files():
     files = []
     for p in sorted(BACKUP_DIR.glob("*.json"), reverse=True):
         files.append({"name": p.name, "size": p.stat().st_size, "time": p.stat().st_mtime})
+    for p in sorted(BACKUP_DIR.glob("*.xlsx"), reverse=True):
+        files.append({"name": p.name, "size": p.stat().st_size, "time": p.stat().st_mtime})
+    files.sort(key=lambda x: -x["time"])
     return files
+
+
+@router.get("/download/{filename}")
+def download_file(filename: str):
+    """下载备份文件。"""
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise BusinessError("非法文件名", 400)
+    p = BACKUP_DIR / filename
+    if not p.exists() or not p.is_file():
+        raise BusinessError("文件不存在", 404)
+    return FileResponse(str(p), filename=filename)

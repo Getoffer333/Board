@@ -43,7 +43,7 @@ def get_jd(jid: int):
 
 @router.get("/{jid}/analyze")
 def analyze_jd(jid: int):
-    """JD 详情分析：保留原文 + 基于求职者背景与简历做匹配分析。"""
+    """JD 详情分析：优先复用已有匹配结果（AI 优先），否则实时本地匹配。"""
     jd = repo("jd").get(jid)
     if not jd:
         raise BusinessError("JD 不存在", 404)
@@ -51,10 +51,34 @@ def analyze_jd(jid: int):
     resumes = [r for r in repo("resume").list() if r.get("is_active", 1)]
     resume = resumes[0] if resumes else None
 
+    match_result = None
+    if resume:
+        # 优先复用已有匹配结果（AI 优先），避免与驾驶舱/匹配分口径不一致
+        existing = repo("match_result").raw(
+            "SELECT * FROM match_result WHERE jd_id=? AND resume_id=? "
+            "ORDER BY CASE source WHEN 'online' THEN 0 ELSE 1 END, score DESC LIMIT 1",
+            (jid, resume["id"]))
+        if existing:
+            r = existing[0]
+            match_result = {
+                "score": r["score"],
+                "source": r["source"],
+                "dimension_scores": load_json(r["dimension_scores"], {}),
+                "matched_points": load_json(r["matched_points"], []),
+                "missing_points": load_json(r["missing_points"], []),
+                "resume_edits": load_json(r.get("resume_edits"), []),
+                "suggestion": r.get("suggestion", ""),
+            }
+        else:
+            try:
+                match_result = match(resume, jd)
+            except Exception:
+                match_result = None
+
     result = {
         "jd": jd,
         "resume_version": resume["version_name"] if resume else None,
-        "match": None,
+        "match": match_result,
         "user": {
             "primary_direction": get_setting("primary_direction", ""),
             "backup_directions": load_json(get_setting("backup_directions", "[]"), []),
@@ -63,11 +87,6 @@ def analyze_jd(jid: int):
             "current_city": get_setting("current_city", ""),
         },
     }
-    if resume:
-        try:
-            result["match"] = match(resume, jd)
-        except Exception:
-            result["match"] = None
     return result
 
 
