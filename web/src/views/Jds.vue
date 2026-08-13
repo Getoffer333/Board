@@ -122,6 +122,7 @@ async function batchMatch() {
   if (selectedIds.value.size === 0) { toast('error', '请先勾选要匹配的 JD'); return }
   if (matching.value) return
   matching.value = true
+  toast('info', `开始 AI 匹配 ${selectedIds.value.size} 个 JD，约需 1-2 分钟...`)
   try {
     const r = await api.post<any>('/api/ai/batch-match', { jd_ids: [...selectedIds.value] })
     matchResults.value = r
@@ -152,6 +153,10 @@ onMounted(load)
 
     <div v-if="batchParsing" class="rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-700 animate-pulse">
       {{ batchProgress }}
+    </div>
+
+    <div v-if="matching" class="rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-700 animate-pulse">
+      🤖 正在并行匹配 {{ selectedIds.size }} 个 JD（约 1-2 分钟），请稍候...
     </div>
 
     <!-- 待解析区 -->
