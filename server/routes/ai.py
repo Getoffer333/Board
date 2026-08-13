@@ -90,7 +90,7 @@ def online_jd_parse(payload: dict = Body(...)):
 
 @router.post("/batch-jd-parse")
 def batch_jd_parse():
-    """批量解析：找出所有已粘贴但未 AI 解析的 JD，逐个调用 LLM 解析。"""
+    """批量解析：找出所有已粘贴但未 AI 解析的 JD，并行调用 LLM 后串行入库。"""
     if get_setting("llm_enabled", "0") != "1":
         raise BusinessError("在线模式未开启，请在设置中启用并配置 API Key")
     todos = [j for j in repo("jd").list()
@@ -98,16 +98,35 @@ def batch_jd_parse():
     if not todos:
         return {"ok": True, "total": 0, "parsed": 0, "failed": 0,
                 "results": [], "message": "没有待解析的 JD"}
-    results = []
-    for jd in todos:
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _fetch(jd):
+        """并行调用 LLM（线程安全），结果暂不写库。"""
         try:
             result = call_llm_json(build_jd_parse_prompt(jd))
-            _apply_jd_parse(jd["id"], result)
-            results.append({"jd_id": jd["id"], "ok": True,
-                            "company": result.get("company", ""),
-                            "title": result.get("title", "")})
+            return jd, result, None
         except Exception as e:
-            results.append({"jd_id": jd["id"], "ok": False, "error": str(e)})
+            return jd, None, str(e)
+
+    # 并行调 LLM（耗时的部分），4 个并发
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        fetched = list(pool.map(_fetch, todos))
+
+    # 串行写库（SQLite 写入安全）
+    results = []
+    for jd, result, err in fetched:
+        if err:
+            results.append({"jd_id": jd["id"], "ok": False, "error": err})
+        else:
+            try:
+                _apply_jd_parse(jd["id"], result)
+                results.append({"jd_id": jd["id"], "ok": True,
+                                "company": result.get("company", ""),
+                                "title": result.get("title", "")})
+            except Exception as e:
+                results.append({"jd_id": jd["id"], "ok": False, "error": str(e)})
+
     ok = sum(1 for r in results if r["ok"])
     return {"ok": True, "total": len(todos), "parsed": ok,
             "failed": len(todos) - ok, "results": results}

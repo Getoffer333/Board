@@ -49,7 +49,7 @@ async function submit() {
 async function batchParse() {
   if (batchParsing.value) return
   batchParsing.value = true
-  batchProgress.value = '正在批量解析，请稍候（逐个调用 AI，耗时取决于数量）...'
+  batchProgress.value = `正在并行解析 ${unparsedCount.value} 个 JD（约 1-2 分钟）...`
   try {
     const r = await api.post<any>('/api/ai/batch-jd-parse')
     batchProgress.value = ''
